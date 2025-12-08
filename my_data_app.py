@@ -13,56 +13,6 @@ import base64
 st.set_page_config(page_title="Dakar Auto App", layout="wide")
 
 
-#  Fonction pour le fond d'écran
-
-def add_bg_from_local(image_file):
-    with open(image_file, "rb") as f:
-        data = f.read()
-    b64 = base64.b64encode(data).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/jpg;base64,{b64}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        .stApp::before {{
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 100%;
-            background-color: rgba(0,0,0,0.4);
-            z-index: -1;
-        }}
-        h1, h2, h3 {{
-            color: #ffffff;
-            text-shadow: 2px 2px 4px #000000;
-        }}
-        .stButton>button {{
-            background-color: #1f77b4;
-            color: white;
-            font-size: 16px;
-            height: 45px;
-            border-radius: 10px;
-            border: none;
-        }}
-        .stButton>button:hover {{
-            background-color: #0b3d91;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# Ajouter le fond
-image_path = "/home/g-raud/selenium-env/images1/img_file2.jpg"
-add_bg_from_local(image_path)
-
-
 # Introduction
 st.markdown("""
 # Dakar Auto Data App
@@ -265,3 +215,4 @@ if page == "Évaluer l'application":
         """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="800" frameborder="0"></iframe>""",
         unsafe_allow_html=True
     )
+
