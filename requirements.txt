@@ -8,3 +8,6 @@ streamlit
 seaborn
 pybase64
 
+pandas
+beautifulsoup4
+plotly
