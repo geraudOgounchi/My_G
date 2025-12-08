@@ -99,8 +99,8 @@ a {
 }
 /* Tableau : augmenter padding et taille */
 .dataframe th, .dataframe td {
-    padding: 12px 10px;
-    font-size: 14px;
+    padding: 20px 15px;
+    font-size: 16px;
 }
 @media (max-width: 768px) {
     .main .block-container {
@@ -321,5 +321,6 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
 
