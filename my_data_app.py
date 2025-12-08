@@ -8,6 +8,30 @@ import plotly.express as px
 import base64
 
 # ---------------------------------------------------
+# CSS pour le fond
+# ---------------------------------------------------
+page_bg_img = """
+<style>
+.stApp {
+background-image: url("https://images.unsplash.com/photo-1517949908117-3c9d15e0d846?auto=format&fit=crop&w=1470&q=80"); /* Exemple : voiture */
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+background-attachment: fixed;
+}
+
+</style>
+"""
+st.markdown(page_bg_img, unsafe_allow_html=True)
+
+# ---------------------------------------------------
+# Contenu de la page
+# ---------------------------------------------------
+st.header("Évaluez mon application")
+st.markdown("Merci de prendre un moment pour évaluer cette application :")
+
+
+# ---------------------------------------------------
 # 1. CSS et design premium (AJOUTS GW-STYLE)
 # ---------------------------------------------------
 st.markdown("""
@@ -370,7 +394,7 @@ if page == "Évaluer l'application":
     # Formulaire 2 (Google Form)
     with col2:
         st.markdown(
-            """<iframe src="https://docs.google.com/forms/d/e/1FAIpQLScnFGbGlFams8BK3BgO7FofRdKPnDvQs7M4TTvatpr3Ybll4w/viewform?usp=dialog" width="100%" height="600" frameborder="0"></iframe>""",
+            """<iframe src="https://docs.google.com/forms/d/1T6ItdvCSsKZjP8R7oqvD3y9whWAxG_54oqHau_840ho/preview" width="100%" height="600" frameborder="0"></iframe>""",
             unsafe_allow_html=True
         )
 
@@ -383,3 +407,4 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
