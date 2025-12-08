@@ -12,7 +12,6 @@ import base64
 # ---------------------------------------------------
 st.markdown("""
 <style>
-/* Header premium */
 .title-style {
     text-align: center;
     font-size: 42px;
@@ -27,14 +26,10 @@ st.markdown("""
     color: #C8D6E5;
     margin-top: -10px;
 }
-
-/* Sidebar */
 .sidebar .sidebar-content {
     background-color: #14263F;
     color: #F0F0F0;
 }
-
-/* Boutons bleu électrique */
 .stButton>button {
     background-color: #1E90FF;
     color: white;
@@ -49,8 +44,6 @@ st.markdown("""
     background-color: #63B3FF;
     transform: scale(1.03);
 }
-
-/* Container padding */
 .block-container {
     padding-top: 2rem;
 }
@@ -106,31 +99,31 @@ def scrape_dakar_auto(url_base, num_pages):
                 df_all.append({
                     "brand": brand, "model": model, "year": year, "ref": ref,
                     "km": km, "fuel": fuel, "gearbox": gearbox,
-                    "price": pd.to_numeric(price) if price and price.isnumeric() else None,
+                    "price": price,
                     "owner": owner, "adress": adress
                 })
             except: pass
     return pd.DataFrame(df_all)
 
 # ---------------------------------------------------
-# 5. Cleaning automatique
+# 5. Nettoyage automatique
 # ---------------------------------------------------
 def clean_df(df):
     df = df.copy()
     
-    # Nettoyer les colonnes string
+    # Colonnes texte
     str_cols = ["brand","model","fuel","gearbox","owner","adress","ref","category"]
     for col in str_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip().replace({"None":"", "nan":""})
+            df[col] = df[col].astype(str).str.strip().replace({"None":"Unknown", "nan":"Unknown"})
     
-    # Numeric columns
+    # Colonnes numériques
     if "year" in df.columns:
-        df["year"] = pd.to_numeric(df["year"], errors="coerce")
+        df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(-1).astype(int)
     if "km" in df.columns:
-        df["km"] = pd.to_numeric(df["km"].str.replace(r"[^0-9]","", regex=True), errors="coerce")
+        df["km"] = pd.to_numeric(df["km"].str.replace(r"[^0-9]","", regex=True), errors="coerce").fillna(0).astype(int)
     if "price" in df.columns:
-        df["price"] = pd.to_numeric(df["price"], errors="coerce")
+        df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0).astype(int)
     
     # Supprimer doublons
     df = df.drop_duplicates().reset_index(drop=True)
@@ -159,7 +152,7 @@ if page == "Scraping":
                 st.session_state[f"df_{cat}"] = df_tmp
         st.success("Scraping terminé !")
 
-    # Boutons pour chaque catégorie
+    # Affichage et téléchargement
     for cat in URLS.keys():
         st.subheader(f"Données {cat.capitalize()}")
         if st.button(f"Afficher {cat}"):
@@ -177,7 +170,7 @@ if page == "Scraping":
                 mime="text/csv"
             )
 
-    # Sauvegarde dans SQLite
+    # Sauvegarde SQLite
     conn = sqlite3.connect("dakar_auto_data.db")
     for cat in URLS.keys():
         if f"df_{cat}" in st.session_state:
@@ -186,7 +179,7 @@ if page == "Scraping":
     st.info("Les données ont été sauvegardées dans la base SQLite 'dakar_auto_data.db'.")
 
 # ---------------------------------------------------
-# 7. Page Dashboard
+# 7. Dashboard
 # ---------------------------------------------------
 if page == "Dashboard":
     st.header("Dashboard complet")
@@ -195,8 +188,6 @@ if page == "Dashboard":
     for cat in ["voitures","location","motos"]:
         try:
             dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
-            if not dfs[cat].empty:
-                dfs[cat] = clean_df(dfs[cat])  # <-- Nettoyage automatique
         except:
             dfs[cat] = pd.DataFrame()
     conn.close()
@@ -205,7 +196,6 @@ if page == "Dashboard":
         st.info("Aucune donnée disponible. Lancez d'abord le scraping.")
     else:
         df_total = pd.concat(dfs.values(), ignore_index=True)
-
         st.subheader("Informations sur le dataset")
         st.markdown(f"- Dimensions : {df_total.shape[0]} lignes, {df_total.shape[1]} colonnes")
         st.markdown("**Valeurs manquantes par colonne :**")
