@@ -308,7 +308,7 @@ if page == "Évaluer l'application":
 
     with col2:
         st.markdown(
-            """<iframe src="https://docs.google.com/forms/d/1T6ItdvCSsKZjP8R7oqvD3y9whWAxG_54oqHau_840ho/previewResponse" width="100%" height="900" frameborder="0"></iframe>""",
+            """<iframe src="https://docs.google.com/forms/d/e/1FAIpQLScnFGbGlFams8BK3BgO7FofRdKPnDvQs7M4TTvatpr3Ybll4w/viewform?usp=header" width="100%" height="900" frameborder="0"></iframe>""",
             unsafe_allow_html=True
         )
 
@@ -321,3 +321,4 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
