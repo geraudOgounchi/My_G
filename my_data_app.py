@@ -34,6 +34,12 @@ def set_bg_image(image_file):
 set_bg_image("image/img_file2.jpg")
 
 # ---------------------------------------------------
+# Contenu de la page
+# ---------------------------------------------------
+st.header("Évaluez mon application")
+st.markdown("Merci de prendre un moment pour évaluer cette application :")
+
+# ---------------------------------------------------
 # CSS et design premium (ajout padding cellules)
 # ---------------------------------------------------
 st.markdown("""
@@ -91,6 +97,7 @@ a {
     color: #60a5fa !important;
     text-decoration: none;
 }
+/* Small cards look */
 .metric-container {
     background-color: rgba(255,255,255,0.02);
     padding: 12px;
