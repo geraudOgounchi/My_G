@@ -356,12 +356,21 @@ if page == "À propos":
 # ---------------------------------------------------
 if page == "Évaluer l'application":
     st.header("Évaluez mon application")
-    st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant le formulaire ci-dessous :")
-    st.markdown(
-        """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="800" frameborder="0"></iframe>""",
-        unsafe_allow_html=True
-    )
+    st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant les formulaires ci-dessous :")
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(
+            """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="900" frameborder="0"></iframe>""",
+            unsafe_allow_html=True
+        )
+
+    with col2:
+        st.markdown(
+            """<iframe src="https://docs.google.com/forms/d/e/1FAIpQLScnFGbGlFams8BK3BgO7FofRdKPnDvQs7M4TTvatpr3Ybll4w/viewform?usp=header" width="100%" height="900" frameborder="0"></iframe>""",
+            unsafe_allow_html=True
+        )
 # ---------------------------------------------------
 # 11. Footer premium
 # ---------------------------------------------------
@@ -371,3 +380,4 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
