@@ -9,9 +9,7 @@ import base64
 
 
 # Configuration générale
-
-st.set_page_config(page_title="Dakar Auto App", layout="wide")
-
+st.markdown("<h1 style='text-align: center; color: black;'>MY DATA APP</h1>", unsafe_allow_html=True)
 
 # Introduction
 st.markdown("""
@@ -215,4 +213,5 @@ if page == "Évaluer l'application":
         """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="800" frameborder="0"></iframe>""",
         unsafe_allow_html=True
     )
+
 
