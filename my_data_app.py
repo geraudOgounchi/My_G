@@ -99,8 +99,8 @@ a {
 }
 /* Tableau : augmenter padding et taille */
 .dataframe th, .dataframe td {
-    padding: 20px 15px;
-    font-size: 16px;
+    padding: 100px 15px;
+    font-size: 30px;
 }
 @media (max-width: 768px) {
     .main .block-container {
@@ -318,9 +318,10 @@ if page == "Évaluer l'application":
 st.markdown("""
 <hr>
 <p style='text-align:center; color:#C8D6E5; margin-top:20px;'>
-Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
+Créé par Géraud OGOUNCHI pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
 
 
