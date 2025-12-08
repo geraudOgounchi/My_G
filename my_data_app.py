@@ -227,7 +227,7 @@ if page == "Dashboard":
 # 7. Page anciens CSV
 # ---------------------------------------------------
 if page == "Ancien CSV":
-    st.header("📂 Fichiers CSV existants")
+    st.header("Fichiers CSV existants")
     data_folder = "data"
     if os.path.exists(data_folder):
         csv_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
@@ -237,7 +237,7 @@ if page == "Ancien CSV":
                     df_file = pd.read_csv(os.path.join(data_folder, file))
                     st.dataframe(df_file)
                 csv_bytes = pd.read_csv(os.path.join(data_folder, file)).to_csv(index=False).encode("utf-8")
-                st.download_button(label=f"📥 Télécharger {file}", data=csv_bytes, file_name=file, mime="text/csv")
+                st.download_button(label=f"Télécharger {file}", data=csv_bytes, file_name=file, mime="text/csv")
         else:
             st.warning("Aucun fichier CSV trouvé dans data1.")
     else:
@@ -272,6 +272,7 @@ if page == "Évaluer l'application":
 st.markdown("""
 <hr>
 <p style='text-align:center; color:#C8D6E5; margin-top:20px;'>
-Développé avec ❤️ pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
+Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
