@@ -34,7 +34,7 @@ def set_bg_image(image_file):
 # ---------------------------------------------------
 # Appliquer le fond
 # ---------------------------------------------------
-set_bg_image("images/img_file2.jpg")  # Chemin vers ton image
+set_bg_image("image/img_file2.jpg")  # Chemin vers ton image
 
 # ---------------------------------------------------
 # Contenu de la page
@@ -416,6 +416,7 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
 
 
