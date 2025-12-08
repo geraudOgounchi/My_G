@@ -7,35 +7,81 @@ import os
 import plotly.express as px
 import base64
 
-
-# Configuration générale
-st.markdown("<h1 style='text-align: center; color: black;'>MY DATA APP</h1>", unsafe_allow_html=True)
-
-# Introduction
+# ---------------------------------------------------
+# 1. CSS et design premium
+# ---------------------------------------------------
 st.markdown("""
-# Dakar Auto Data App
-This app performs webscraping of vehicle listings from Dakar-Auto over multiple pages.  
-You can scrape cars, motorcycles, and rental vehicles, visualize them in an interactive dashboard, and download scraped or existing CSV data directly from the app.
+<style>
+/* Header premium */
+.title-style {
+    text-align: center;
+    font-size: 42px;
+    color: #1E90FF;
+    font-weight: bold;
+    margin-top: -30px;
+    text-shadow: 0 0 10px rgba(30,144,255,0.6);
+}
+.subtitle-style {
+    text-align: center;
+    font-size: 18px;
+    color: #C8D6E5;
+    margin-top: -10px;
+}
 
-**Python libraries used:** `base64`, `pandas`, `streamlit`, `requests`, `bs4`, `plotly`  
-**Data source:** Expat-Dakar — Dakar-Auto
-""")
+/* Sidebar */
+.sidebar .sidebar-content {
+    background-color: #14263F;
+    color: #F0F0F0;
+}
 
+/* Boutons bleu électrique */
+.stButton>button {
+    background-color: #1E90FF;
+    color: white;
+    border-radius: 10px;
+    padding: 0.6em 1.2em;
+    font-size: 16px;
+    border: none;
+    box-shadow: 0 0 10px rgba(30,144,255,0.6);
+    transition: 0.3s;
+}
+.stButton>button:hover {
+    background-color: #63B3FF;
+    transform: scale(1.03);
+}
 
-# Barre latérale / navigation
+/* Container padding */
+.block-container {
+    padding-top: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
-st.sidebar.title("Navigation")
+# ---------------------------------------------------
+# 2. Header premium
+# ---------------------------------------------------
+st.markdown("<h1 class='title-style'>DAKAR AUTO SCRAPER</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle-style'>Analyse & Extraction Automatisée des Annonces Voitures / Motos</p>", unsafe_allow_html=True)
+
+# ---------------------------------------------------
+# 3. Sidebar navigation
+# ---------------------------------------------------
+st.sidebar.markdown("""
+<h2 style='color:#1E90FF; text-align:center;'>⚙️ Navigation</h2>
+<p style='color:#C8D6E5; text-align:center;'>Choisir une page</p>
+<hr style='border:1px solid #1E90FF;'>
+""", unsafe_allow_html=True)
+
 page = st.sidebar.radio("Aller à :", ["Scraping", "Dashboard", "Ancien CSV", "À propos", "Évaluer l'application"])
 
-
-# Fonction de scraping
+# ---------------------------------------------------
+# 4. Fonction de scraping
+# ---------------------------------------------------
 def scrape_dakar_auto(url_base, num_pages):
     df_all = []
     for page_num in range(1, num_pages + 1):
         url = f"{url_base}{page_num}"
         res = get(url)
-        #if res.status_code != 200:
-        #    continue
         soup = bs(res.content, "html.parser")
         containers = soup.find_all("div", class_="listings-cards__list-item mb-md-3 mb-3")
         for cont in containers:
@@ -66,10 +112,12 @@ def scrape_dakar_auto(url_base, num_pages):
             except: pass
     return pd.DataFrame(df_all)
 
-# Page Scraping
+# ---------------------------------------------------
+# 5. Page Scraping
+# ---------------------------------------------------
 if page == "Scraping":
     st.header("Scraping Dakar Auto")
-    num_pages = st.number_input("Nombre de pages à scraper par catégorie", min_value=1, max_value=50, value=1, step=1)
+    num_pages = st.sidebar.number_input("Nombre de pages à scraper par catégorie", min_value=1, max_value=50, value=1, step=1)
 
     URLS = {
         "voitures": "https://dakar-auto.com/senegal/voitures-4?&page=",
@@ -85,7 +133,6 @@ if page == "Scraping":
                 st.session_state[f"df_{cat}"] = df_tmp
         st.success("Scraping terminé !")
 
-    
     # Boutons pour chaque catégorie
     for cat in URLS.keys():
         st.subheader(f"Données {cat.capitalize()}")
@@ -112,8 +159,9 @@ if page == "Scraping":
     conn.close()
     st.info("Les données ont été sauvegardées dans la base SQLite 'dakar_auto_data.db'.")
 
-
-# Page Dashboard
+# ---------------------------------------------------
+# 6. Page Dashboard
+# ---------------------------------------------------
 if page == "Dashboard":
     st.header("Dashboard complet")
     conn = sqlite3.connect("dakar_auto_data.db")
@@ -139,10 +187,10 @@ if page == "Dashboard":
         st.subheader("Données brutes")
         st.dataframe(df_total)
 
-        # Visualisations
+        # Visualisations interactives
         if df_total["price"].notnull().any():
             st.plotly_chart(px.histogram(df_total, x="price", nbins=30, title="Distribution des prix"), use_container_width=True)
-        
+
         df_cat_count = df_total["category"].value_counts().reset_index()
         df_cat_count.columns = ["category","category_count"]
         st.plotly_chart(px.bar(df_cat_count, x="category", y="category_count", title="Nombre de listings par catégorie"), use_container_width=True)
@@ -175,11 +223,12 @@ if page == "Dashboard":
         csv = df_total.to_csv(index=False).encode("utf-8")
         st.download_button(label="Télécharger toutes les données du scraping", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
 
-
-# Page anciens CSV
+# ---------------------------------------------------
+# 7. Page anciens CSV
+# ---------------------------------------------------
 if page == "Ancien CSV":
-    st.header("📂 Fichiers CSV existants (data1)")
-    data_folder = "data1"
+    st.header("📂 Fichiers CSV existants")
+    data_folder = "data"
     if os.path.exists(data_folder):
         csv_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
         if csv_files:
@@ -194,7 +243,9 @@ if page == "Ancien CSV":
     else:
         st.info("Le dossier data1 n'existe pas.")
 
-# Page À propos
+# ---------------------------------------------------
+# 8. Page À propos
+# ---------------------------------------------------
 if page == "À propos":
     st.header("À propos de l'application")
     st.markdown("""
@@ -204,8 +255,9 @@ if page == "À propos":
     """)
     st.markdown("Créée par : *OGOUNCHI Géraud*")
 
-
-# Page Évaluer l'application
+# ---------------------------------------------------
+# 9. Page Évaluer l'application
+# ---------------------------------------------------
 if page == "Évaluer l'application":
     st.header("Évaluez mon application")
     st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant le formulaire ci-dessous :")
@@ -214,4 +266,12 @@ if page == "Évaluer l'application":
         unsafe_allow_html=True
     )
 
-
+# ---------------------------------------------------
+# 10. Footer premium
+# ---------------------------------------------------
+st.markdown("""
+<hr>
+<p style='text-align:center; color:#C8D6E5; margin-top:20px;'>
+Développé avec ❤️ pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
+</p>
+""", unsafe_allow_html=True)
