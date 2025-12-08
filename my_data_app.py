@@ -7,6 +7,42 @@ import os
 import plotly.express as px
 import base64
 
+import streamlit as st
+import base64
+
+# ---------------------------------------------------
+# Fonction pour mettre une image locale en fond
+# ---------------------------------------------------
+def set_bg_image(image_file):
+    with open(image_file, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ---------------------------------------------------
+# Appliquer le fond
+# ---------------------------------------------------
+set_bg_image("images/img_file2.jpg")  # Chemin vers ton image
+
+# ---------------------------------------------------
+# Contenu de la page
+# ---------------------------------------------------
+st.header("Évaluez mon application")
+st.markdown("Merci de prendre un moment pour évaluer cette application :")
+
+
 # ---------------------------------------------------
 # 1. CSS et design premium (AJOUTS GW-STYLE)
 # ---------------------------------------------------
@@ -380,4 +416,5 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
