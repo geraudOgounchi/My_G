@@ -99,8 +99,8 @@ a {
 }
 /* Tableau : augmenter padding et taille */
 .dataframe th, .dataframe td {
-    padding: 100px 15px;
-    font-size: 30px;
+    padding: 12px 10px;
+    font-size: 14px;
 }
 @media (max-width: 768px) {
     .main .block-container {
@@ -308,7 +308,7 @@ if page == "Évaluer l'application":
 
     with col2:
         st.markdown(
-            """<iframe src="https://docs.google.com/forms/d/e/1FAIpQLScnFGbGlFams8BK3BgO7FofRdKPnDvQs7M4TTvatpr3Ybll4w/viewform?usp=dialog" width="100%" height="900" frameborder="0"></iframe>""",
+            """<iframe src="https://docs.google.com/forms/d/1T6ItdvCSsKZjP8R7oqvD3y9whWAxG_54oqHau_840ho/previewResponse" width="100%" height="900" frameborder="0"></iframe>""",
             unsafe_allow_html=True
         )
 
@@ -318,10 +318,6 @@ if page == "Évaluer l'application":
 st.markdown("""
 <hr>
 <p style='text-align:center; color:#C8D6E5; margin-top:20px;'>
-Créé par Géraud OGOUNCHI pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
+Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
-
-
-
-
