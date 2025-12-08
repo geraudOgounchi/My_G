@@ -8,44 +8,95 @@ import plotly.express as px
 import base64
 
 # ---------------------------------------------------
-# 1. CSS et design premium
+# 1. CSS et design premium (AJOUTS GW-STYLE)
 # ---------------------------------------------------
+# NOTE: je n'ai pas modifié le background global — les couleurs de fond restent celles de ton thème.
 st.markdown("""
 <style>
+/* ----- Conserver ton style titre/subtitle mais améliorer l'espacement ----- */
 .title-style {
     text-align: center;
     font-size: 42px;
     color: #1E90FF;
-    font-weight: bold;
-    margin-top: -30px;
-    text-shadow: 0 0 10px rgba(30,144,255,0.6);
+    font-weight: 700;
+    margin-top: -10px;
+    text-shadow: 0 0 10px rgba(30,144,255,0.25);
 }
 .subtitle-style {
     text-align: center;
-    font-size: 18px;
+    font-size: 15px;
     color: #C8D6E5;
-    margin-top: -10px;
+    margin-top: -6px;
 }
+
+/* ----- GW-like layout: plus de padding central ----- */
+.main .block-container {
+    padding-top: 2.5rem;
+    padding-left: 4rem;
+    padding-right: 4rem;
+}
+
+/* ----- Sidebar (améliorations visuelles sans changer le fond global) ----- */
 .sidebar .sidebar-content {
-    background-color: #14263F;
+    background-color: #14263F; /* conservation identique */
     color: #F0F0F0;
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-radius: 8px;
 }
+
+/* Forcer couleur du texte dans la sidebar */
+[data-testid="stSidebar"] * {
+    color: #F0F0F0 !important;
+}
+
+/* ----- Boutons bleu électrique (conservés) ----- */
 .stButton>button {
     background-color: #1E90FF;
     color: white;
     border-radius: 10px;
     padding: 0.6em 1.2em;
-    font-size: 16px;
+    font-size: 15px;
     border: none;
-    box-shadow: 0 0 10px rgba(30,144,255,0.6);
-    transition: 0.3s;
+    box-shadow: 0 0 10px rgba(30,144,255,0.12);
+    transition: 0.18s;
 }
 .stButton>button:hover {
     background-color: #63B3FF;
-    transform: scale(1.03);
+    transform: translateY(-1px);
 }
-.block-container {
-    padding-top: 2rem;
+
+/* ----- Sliders et checkbox : GW-like but keep coherence ----- */
+/* slider track accent */
+div[role="slider"] > input[type="range"] {
+    accent-color: #ef4444; /* rouge GW-like accent pour les sliders si présent */
+}
+
+/* Checkbox label color */
+.stCheckbox > label {
+    color: #F0F0F0;
+}
+
+/* Links */
+a {
+    color: #60a5fa !important;
+    text-decoration: none;
+}
+
+/* Small cards look for metrics */
+.metric-container {
+    background-color: rgba(255,255,255,0.02);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -60,74 +111,88 @@ st.markdown("<p class='subtitle-style'>Analyse & Extraction Automatisée des Ann
 # 3. Sidebar navigation
 # ---------------------------------------------------
 st.sidebar.markdown("""
-<h2 style='color:#1E90FF; text-align:center;'>⚙️ Navigation</h2>
-<p style='color:#C8D6E5; text-align:center;'>Choisir une page</p>
+<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'>⚙️ Navigation</h2>
+<p style='color:#C8D6E5; text-align:center; margin-top:0.0rem; margin-bottom:0.6rem;'>Choisir une page</p>
 <hr style='border:1px solid #1E90FF;'>
 """, unsafe_allow_html=True)
 
 page = st.sidebar.radio("Aller à :", ["Scraping", "Dashboard", "Ancien CSV", "À propos", "Évaluer l'application"])
 
 # ---------------------------------------------------
-# 4. Fonction de scraping
+# 4. Fonction de scraping (identique à la tienne)
 # ---------------------------------------------------
 def scrape_dakar_auto(url_base, num_pages):
     df_all = []
     for page_num in range(1, num_pages + 1):
         url = f"{url_base}{page_num}"
-        res = get(url)
+        try:
+            res = get(url, timeout=15)
+        except Exception:
+            continue
         soup = bs(res.content, "html.parser")
         containers = soup.find_all("div", class_="listings-cards__list-item mb-md-3 mb-3")
         for cont in containers:
             try:
                 title = cont.find("h2", class_="listing-card__header__title mb-md-2 mb-0")
-                if not title: continue
+                if not title: 
+                    continue
                 parts = title.a.text.strip().split()
-                brand = parts[0]
-                year = parts[-1]
-                model = " ".join(parts[1:-1])
+                brand = parts[0] if len(parts) > 0 else None
+                year = parts[-1] if len(parts) > 1 else None
+                model = " ".join(parts[1:-1]) if len(parts) > 2 else None
                 attributes = cont.find_all("li", "listing-card__attribute list-inline-item")
-                ref = attributes[0].text.split()[-1].strip() if len(attributes)>0 else None
-                km = attributes[1].text.replace("km","").strip() if len(attributes)>1 else None
-                gearbox = attributes[2].text.strip() if len(attributes)>2 else None
-                fuel = attributes[3].text.strip() if len(attributes)>3 else None
+                ref = attributes[0].text.split()[-1].strip() if len(attributes) > 0 else None
+                km = attributes[1].text.replace("km","").strip() if len(attributes) > 1 else None
+                gearbox = attributes[2].text.strip() if len(attributes) > 2 else None
+                fuel = attributes[3].text.strip() if len(attributes) > 3 else None
                 price_raw = cont.find("h3", "listing-card__header__price font-weight-bold text-uppercase mb-0")
                 price = price_raw.text.strip().replace("FCFA","").replace(" ","") if price_raw else None
                 owner_raw = cont.find("p", "time-author m-0")
                 owner = owner_raw.a.text.replace("Par","").strip() if owner_raw and owner_raw.a else None
                 addr_raw = cont.find("div", "col-12 entry-zone-address")
                 adress = addr_raw.text.strip().replace("\n","") if addr_raw else None
+
                 df_all.append({
-                    "brand": brand, "model": model, "year": year, "ref": ref,
-                    "km": km, "fuel": fuel, "gearbox": gearbox,
+                    "brand": brand,
+                    "model": model,
+                    "year": year,
+                    "ref": ref,
+                    "km": km,
+                    "fuel": fuel,
+                    "gearbox": gearbox,
                     "price": price,
-                    "owner": owner, "adress": adress
+                    "owner": owner,
+                    "adress": adress
                 })
-            except: pass
+            except Exception:
+                # ne pas stopper l'exécution sur une annonce foireuse
+                pass
     return pd.DataFrame(df_all)
 
 # ---------------------------------------------------
-# 5. Nettoyage automatique
+# 5. Nettoyage automatique (remplacement None -> Unknown, numériques par défaut)
 # ---------------------------------------------------
 def clean_df(df):
     df = df.copy()
-    
     # Colonnes texte
     str_cols = ["brand","model","fuel","gearbox","owner","adress","ref","category"]
     for col in str_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip().replace({"None":"Unknown", "nan":"Unknown"})
-    
+            # remplacer None/NaN et nettoyer espaces
+            df[col] = df[col].fillna("").astype(str).str.strip()
+            df[col] = df[col].replace({"": "Unknown", "None": "Unknown", "nan": "Unknown"})
     # Colonnes numériques
     if "year" in df.columns:
         df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(-1).astype(int)
     if "km" in df.columns:
-        df["km"] = pd.to_numeric(df["km"].str.replace(r"[^0-9]","", regex=True), errors="coerce").fillna(0).astype(int)
+        # retirer tout sauf chiffres puis numeric
+        df["km"] = df["km"].astype(str).str.replace(r"[^0-9]", "", regex=True)
+        df["km"] = pd.to_numeric(df["km"], errors="coerce").fillna(0).astype(int)
     if "price" in df.columns:
+        df["price"] = df["price"].astype(str).str.replace(r"[^0-9]", "", regex=True)
         df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0).astype(int)
-    
     # Supprimer doublons
     df = df.drop_duplicates().reset_index(drop=True)
-    
     return df
 
 # ---------------------------------------------------
@@ -135,6 +200,7 @@ def clean_df(df):
 # ---------------------------------------------------
 if page == "Scraping":
     st.header("Scraping Dakar Auto")
+    # on garde l'input dans la sidebar comme avant pour garder la mise en page GW-like
     num_pages = st.sidebar.number_input("Nombre de pages à scraper par catégorie", min_value=1, max_value=50, value=1, step=1)
 
     URLS = {
@@ -155,20 +221,23 @@ if page == "Scraping":
     # Affichage et téléchargement
     for cat in URLS.keys():
         st.subheader(f"Données {cat.capitalize()}")
-        if st.button(f"Afficher {cat}"):
+        # Utiliser columns pour afficher boutons côte à côte
+        c1, c2 = st.columns([1, 3])
+        with c1:
+            if st.button(f"Afficher {cat}"):
+                if f"df_{cat}" in st.session_state:
+                    st.dataframe(st.session_state[f"df_{cat}"], use_container_width=True)
+                else:
+                    st.warning(f"Aucune donnée disponible pour {cat}. Lancez le scraping d'abord.")
+        with c2:
             if f"df_{cat}" in st.session_state:
-                st.dataframe(st.session_state[f"df_{cat}"])
-            else:
-                st.warning(f"Aucune donnée disponible pour {cat}. Lancez le scraping d'abord.")
-
-        if f"df_{cat}" in st.session_state:
-            csv_bytes = st.session_state[f"df_{cat}"].to_csv(index=False).encode("utf-8")
-            st.download_button(
-                label=f"Télécharger {cat}",
-                data=csv_bytes,
-                file_name=f"{cat}_scraped.csv",
-                mime="text/csv"
-            )
+                csv_bytes = st.session_state[f"df_{cat}"].to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label=f"Télécharger {cat}",
+                    data=csv_bytes,
+                    file_name=f"{cat}_scraped.csv",
+                    mime="text/csv"
+                )
 
     # Sauvegarde SQLite
     conn = sqlite3.connect("dakar_auto_data.db")
@@ -188,7 +257,9 @@ if page == "Dashboard":
     for cat in ["voitures","location","motos"]:
         try:
             dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
-        except:
+            if not dfs[cat].empty:
+                dfs[cat] = clean_df(dfs[cat])  # nettoyage au chargement
+        except Exception:
             dfs[cat] = pd.DataFrame()
     conn.close()
 
@@ -196,6 +267,7 @@ if page == "Dashboard":
         st.info("Aucune donnée disponible. Lancez d'abord le scraping.")
     else:
         df_total = pd.concat(dfs.values(), ignore_index=True)
+
         st.subheader("Informations sur le dataset")
         st.markdown(f"- Dimensions : {df_total.shape[0]} lignes, {df_total.shape[1]} colonnes")
         st.markdown("**Valeurs manquantes par colonne :**")
@@ -206,37 +278,43 @@ if page == "Dashboard":
         st.dataframe(df_total)
 
         # Visualisations interactives
-        if df_total["price"].notnull().any():
+        if "price" in df_total.columns and df_total["price"].notnull().any():
             st.plotly_chart(px.histogram(df_total, x="price", nbins=30, title="Distribution des prix"), use_container_width=True)
 
-        df_cat_count = df_total["category"].value_counts().reset_index()
-        df_cat_count.columns = ["category","category_count"]
-        st.plotly_chart(px.bar(df_cat_count, x="category", y="category_count", title="Nombre de listings par catégorie"), use_container_width=True)
-        st.plotly_chart(px.pie(df_cat_count, names="category", values="category_count", title="Proportion par catégorie"), use_container_width=True)
+        if "category" in df_total.columns:
+            df_cat_count = df_total["category"].value_counts().reset_index()
+            df_cat_count.columns = ["category","category_count"]
+            st.plotly_chart(px.bar(df_cat_count, x="category", y="category_count", title="Nombre de listings par catégorie"), use_container_width=True)
+            st.plotly_chart(px.pie(df_cat_count, names="category", values="category_count", title="Proportion par catégorie"), use_container_width=True)
 
-        df_brand_count = df_total["brand"].value_counts().reset_index()
-        df_brand_count.columns = ["brand","count"]
-        st.plotly_chart(px.bar(df_brand_count, x="brand", y="count", title="Nombre de véhicules par marque"), use_container_width=True)
+        if "brand" in df_total.columns:
+            df_brand_count = df_total["brand"].value_counts().reset_index()
+            df_brand_count.columns = ["brand","count"]
+            st.plotly_chart(px.bar(df_brand_count, x="brand", y="count", title="Nombre de véhicules par marque"), use_container_width=True)
 
-        df_top10_brand = df_brand_count.head(10)
-        st.plotly_chart(px.pie(df_top10_brand, names="brand", values="count", title="Top 10 marques"), use_container_width=True)
+            df_top10_brand = df_brand_count.head(10)
+            st.plotly_chart(px.pie(df_top10_brand, names="brand", values="count", title="Top 10 marques"), use_container_width=True)
 
-        df_brand_price = df_total.groupby("brand")["price"].mean().reset_index().sort_values("price", ascending=False)
-        st.plotly_chart(px.bar(df_brand_price, x="brand", y="price", title="Prix moyen par marque"), use_container_width=True)
+            if "price" in df_total.columns:
+                df_brand_price = df_total.groupby("brand")["price"].mean().reset_index().sort_values("price", ascending=False)
+                st.plotly_chart(px.bar(df_brand_price, x="brand", y="price", title="Prix moyen par marque"), use_container_width=True)
 
-        st.plotly_chart(px.box(df_total, x="category", y="price", title="Boxplot : Prix par catégorie"), use_container_width=True)
-        top10_brands = df_total["brand"].value_counts().head(10).index
-        st.plotly_chart(px.box(df_total[df_total["brand"].isin(top10_brands)], x="brand", y="price", title="Boxplot : Prix par marque (Top 10)"), use_container_width=True)
+                st.plotly_chart(px.box(df_total, x="category", y="price", title="Boxplot : Prix par catégorie"), use_container_width=True)
+                top10_brands = df_total["brand"].value_counts().head(10).index
+                st.plotly_chart(px.box(df_total[df_total["brand"].isin(top10_brands)], x="brand", y="price", title="Boxplot : Prix par marque (Top 10)"), use_container_width=True)
 
-        df_scatter = df_total[df_total["price"].notnull() & df_total["km"].notnull()]
-        if not df_scatter.empty:
-            df_scatter["km"] = pd.to_numeric(df_scatter["km"], errors='coerce')
-            df_scatter = df_scatter.dropna(subset=["km"])
-            st.plotly_chart(px.scatter(df_scatter, x="km", y="price", color="category",
-                                       hover_data=["brand","model","year"], title="Prix vs kilométrage"), use_container_width=True)
+        # Scatter price vs km
+        if "price" in df_total.columns and "km" in df_total.columns:
+            df_scatter = df_total[(df_total["price"].notnull()) & (df_total["km"].notnull())]
+            if not df_scatter.empty:
+                df_scatter["km"] = pd.to_numeric(df_scatter["km"], errors='coerce')
+                df_scatter = df_scatter.dropna(subset=["km"])
+                st.plotly_chart(px.scatter(df_scatter, x="km", y="price", color="category",
+                                           hover_data=["brand","model","year"], title="Prix vs kilométrage"), use_container_width=True)
 
-        df_year = df_total[df_total["year"].notnull()]
-        st.plotly_chart(px.histogram(df_year, x="year", nbins=20, title="Répartition des années des véhicules"), use_container_width=True)
+        if "year" in df_total.columns:
+            df_year = df_total[df_total["year"].notnull()]
+            st.plotly_chart(px.histogram(df_year, x="year", nbins=20, title="Répartition des années des véhicules"), use_container_width=True)
 
         csv = df_total.to_csv(index=False).encode("utf-8")
         st.download_button(label="Télécharger toutes les données du scraping", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
