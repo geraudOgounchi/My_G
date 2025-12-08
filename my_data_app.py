@@ -1,19 +1,21 @@
 import streamlit as st
 import pandas as pd
 from bs4 import BeautifulSoup as bs
-from requests import get
+from requests import Session, get
 import sqlite3
 import os
 import plotly.express as px
 import base64
+import time
+import random
+from requests.adapters import HTTPAdapter, Retry
 
 # ---------------------------------------------------
-# 1. CSS et design premium (AJOUTS GW-STYLE)
+# Keep your visual style (DO NOT change background)
 # ---------------------------------------------------
-# NOTE: je n'ai pas modifié le background global — les couleurs de fond restent celles de ton thème.
+st.set_page_config(layout="wide")
 st.markdown("""
 <style>
-/* ----- Conserver ton style titre/subtitle mais améliorer l'espacement ----- */
 .title-style {
     text-align: center;
     font-size: 42px;
@@ -28,29 +30,10 @@ st.markdown("""
     color: #C8D6E5;
     margin-top: -6px;
 }
-
-/* ----- GW-like layout: plus de padding central ----- */
-.main .block-container {
-    padding-top: 2.5rem;
-    padding-left: 4rem;
-    padding-right: 4rem;
-}
-
-/* ----- Sidebar (améliorations visuelles sans changer le fond global) ----- */
 .sidebar .sidebar-content {
-    background-color: #14263F; /* conservation identique */
+    background-color: #14263F;
     color: #F0F0F0;
-    padding-top: 1.25rem;
-    padding-bottom: 1.25rem;
-    border-radius: 8px;
 }
-
-/* Forcer couleur du texte dans la sidebar */
-[data-testid="stSidebar"] * {
-    color: #F0F0F0 !important;
-}
-
-/* ----- Boutons bleu électrique (conservés) ----- */
 .stButton>button {
     background-color: #1E90FF;
     color: white;
@@ -65,309 +48,370 @@ st.markdown("""
     background-color: #63B3FF;
     transform: translateY(-1px);
 }
-
-/* ----- Sliders et checkbox : GW-like but keep coherence ----- */
-/* slider track accent */
-div[role="slider"] > input[type="range"] {
-    accent-color: #ef4444; /* rouge GW-like accent pour les sliders si présent */
-}
-
-/* Checkbox label color */
-.stCheckbox > label {
-    color: #F0F0F0;
-}
-
-/* Links */
-a {
-    color: #60a5fa !important;
-    text-decoration: none;
-}
-
-/* Small cards look for metrics */
-.metric-container {
-    background-color: rgba(255,255,255,0.02);
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 8px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .main .block-container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
+.main .block-container {
+    padding-top: 2.5rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------
-# 2. Header premium
-# ---------------------------------------------------
-st.markdown("<h1 class='title-style'>DAKAR AUTO SCRAPER</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle-style'>Analyse & Extraction Automatisée des Annonces Voitures / Motos</p>", unsafe_allow_html=True)
+st.markdown("<h1 class='title-style'>DAKAR AUTO SCRAPER — PRO</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle-style'>Deep-search, cleaning avancé, KPIs et dashboard interactif</p>", unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# 3. Sidebar navigation
+# Sidebar: controls
 # ---------------------------------------------------
-st.sidebar.markdown("""
-<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'>⚙️ Navigation</h2>
-<p style='color:#C8D6E5; text-align:center; margin-top:0.0rem; margin-bottom:0.6rem;'>Choisir une page</p>
-<hr style='border:1px solid #1E90FF;'>
-""", unsafe_allow_html=True)
+st.sidebar.markdown("## ⚙️ Paramètres")
+mode = st.sidebar.selectbox("Mode de scraping", ["Standard (pages fixes)", "Deep Search (crawl)"])
+num_pages = st.sidebar.number_input("Pages (si Standard)", min_value=1, max_value=200, value=2, step=1)
+max_pages_deep = st.sidebar.number_input("Max pages (Deep)", min_value=10, max_value=1000, value=200, step=10)
+rate_seconds = st.sidebar.slider("Pause entre requêtes (s)", 0.5, 5.0, 1.2, step=0.1)
+user_agent = st.sidebar.text_input("User-Agent", value="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0")
+deep_start_url = st.sidebar.text_input("Start URL (Deep)", value="https://dakar-auto.com/senegal/voitures-4?&page=1")
 
-page = st.sidebar.radio("Aller à :", ["Scraping", "Dashboard", "Ancien CSV", "À propos", "Évaluer l'application"])
+st.sidebar.markdown("---")
+do_clean = st.sidebar.checkbox("Appliquer nettoyage avancé (recommandé)", True)
+save_sql = st.sidebar.checkbox("Sauvegarder dans SQLite", True)
+st.sidebar.markdown("---")
+
+launch = st.sidebar.button("🚀 Lancer le scraping PRO")
 
 # ---------------------------------------------------
-# 4. Fonction de scraping (identique à la tienne)
+# Helper: requests Session with retries
 # ---------------------------------------------------
-def scrape_dakar_auto(url_base, num_pages):
-    df_all = []
-    for page_num in range(1, num_pages + 1):
-        url = f"{url_base}{page_num}"
+def make_session(user_agent_str):
+    s = Session()
+    retries = Retry(total=3, backoff_factor=0.8, status_forcelist=[429, 500, 502, 503, 504])
+    s.mount("https://", HTTPAdapter(max_retries=retries))
+    s.headers.update({"User-Agent": user_agent_str})
+    return s
+
+# ---------------------------------------------------
+# Robust scraping with optional deep crawling
+# ---------------------------------------------------
+def parse_listings_from_page(html):
+    soup = bs(html, "html.parser")
+    containers = soup.find_all("div", class_="listings-cards__list-item mb-md-3 mb-3")
+    rows = []
+    for cont in containers:
         try:
-            res = get(url, timeout=15)
+            title = cont.find("h2", class_="listing-card__header__title mb-md-2 mb-0")
+            if not title:
+                continue
+            parts = title.a.text.strip().split()
+            brand = parts[0] if len(parts) > 0 else None
+            year = parts[-1] if len(parts) > 1 else None
+            model = " ".join(parts[1:-1]) if len(parts) > 2 else None
+            attributes = cont.find_all("li", "listing-card__attribute list-inline-item")
+            ref = attributes[0].text.split()[-1].strip() if len(attributes)>0 else None
+            km = attributes[1].text.replace("km","").strip() if len(attributes)>1 else None
+            gearbox = attributes[2].text.strip() if len(attributes)>2 else None
+            fuel = attributes[3].text.strip() if len(attributes)>3 else None
+            price_raw = cont.find("h3", "listing-card__header__price font-weight-bold text-uppercase mb-0")
+            price = price_raw.text.strip().replace("FCFA","").replace(" ","") if price_raw else None
+            owner_raw = cont.find("p", "time-author m-0")
+            owner = owner_raw.a.text.replace("Par","").strip() if owner_raw and owner_raw.a else None
+            addr_raw = cont.find("div", "col-12 entry-zone-address")
+            adress = addr_raw.text.strip().replace("\n","") if addr_raw else None
+            rows.append({
+                "brand": brand, "model": model, "year": year, "ref": ref,
+                "km": km, "fuel": fuel, "gearbox": gearbox,
+                "price": price, "owner": owner, "adress": adress
+            })
         except Exception:
             continue
-        soup = bs(res.content, "html.parser")
-        containers = soup.find_all("div", class_="listings-cards__list-item mb-md-3 mb-3")
-        for cont in containers:
-            try:
-                title = cont.find("h2", class_="listing-card__header__title mb-md-2 mb-0")
-                if not title: 
+    return rows
+
+# Try to detect last page from pagination links (best-effort)
+def detect_last_page(html):
+    soup = bs(html, "html.parser")
+    pages = []
+    for a in soup.select("ul.pagination li a, nav ul.pagination li a"):
+        try:
+            href = a.get("href", "")
+            if "page=" in href:
+                # parse last number
+                import re
+                m = re.search(r"page=(\d+)", href)
+                if m:
+                    pages.append(int(m.group(1)))
+        except:
+            pass
+    return max(pages) if pages else None
+
+# Caching scraping result for a combination of inputs
+@st.cache_data(ttl=60*60)  # cache 1 hour
+def do_scrape(mode, num_pages, max_pages_deep, start_url, ua, rate):
+    session = make_session(ua)
+    all_rows = []
+    pages_scraped = 0
+
+    if mode == "Standard (pages fixes)":
+        # user supplies base urls for categories (we use your defaults)
+        URLS = {
+            "voitures": "https://dakar-auto.com/senegal/voitures-4?&page=",
+            "location": "https://dakar-auto.com/senegal/location-de-voitures-19?&page=",
+            "motos": "https://dakar-auto.com/senegal/motos-and-scooters-3?&page="
+        }
+        for cat, base_url in URLS.items():
+            for p in range(1, num_pages+1):
+                try:
+                    r = session.get(f"{base_url}{p}", timeout=15)
+                    if r.status_code != 200:
+                        continue
+                    rows = parse_listings_from_page(r.text)
+                    for r_ in rows:
+                        r_["category"] = cat
+                    all_rows.extend(rows)
+                    pages_scraped += 1
+                    time.sleep(min(rate, 3) + random.uniform(0, .5))
+                except Exception:
                     continue
-                parts = title.a.text.strip().split()
-                brand = parts[0] if len(parts) > 0 else None
-                year = parts[-1] if len(parts) > 1 else None
-                model = " ".join(parts[1:-1]) if len(parts) > 2 else None
-                attributes = cont.find_all("li", "listing-card__attribute list-inline-item")
-                ref = attributes[0].text.split()[-1].strip() if len(attributes) > 0 else None
-                km = attributes[1].text.replace("km","").strip() if len(attributes) > 1 else None
-                gearbox = attributes[2].text.strip() if len(attributes) > 2 else None
-                fuel = attributes[3].text.strip() if len(attributes) > 3 else None
-                price_raw = cont.find("h3", "listing-card__header__price font-weight-bold text-uppercase mb-0")
-                price = price_raw.text.strip().replace("FCFA","").replace(" ","") if price_raw else None
-                owner_raw = cont.find("p", "time-author m-0")
-                owner = owner_raw.a.text.replace("Par","").strip() if owner_raw and owner_raw.a else None
-                addr_raw = cont.find("div", "col-12 entry-zone-address")
-                adress = addr_raw.text.strip().replace("\n","") if addr_raw else None
 
-                df_all.append({
-                    "brand": brand,
-                    "model": model,
-                    "year": year,
-                    "ref": ref,
-                    "km": km,
-                    "fuel": fuel,
-                    "gearbox": gearbox,
-                    "price": price,
-                    "owner": owner,
-                    "adress": adress
-                })
+    else:
+        # Deep Search starting from start_url — crawl next pages by incrementing page param
+        # best-effort: parse page param and increment until no results or max_pages reached
+        import re
+        m = re.search(r"(.*page=)(\d+)(.*)", start_url)
+        if m:
+            base = m.group(1)
+            start_idx = int(m.group(2))
+            tail = m.group(3) or ""
+        else:
+            # fallback: assume start_url ends with page=1 style
+            base = start_url
+            start_idx = 1
+            tail = ""
+
+        last_detected = None
+        # Try to detect last page from first page
+        try:
+            r0 = session.get(start_url, timeout=15)
+            last_detected = detect_last_page(r0.text)
+        except Exception:
+            last_detected = None
+
+        # Plan pages to iterate
+        if last_detected:
+            pages_to_try = list(range(start_idx, min(last_detected+1, start_idx + max_pages_deep)))
+        else:
+            pages_to_try = list(range(start_idx, start_idx + max_pages_deep))
+
+        for p in pages_to_try:
+            cur_url = f"{base}{p}{tail}"
+            try:
+                r = session.get(cur_url, timeout=15)
+                if r.status_code != 200:
+                    # if many consecutive failures, break
+                    continue
+                rows = parse_listings_from_page(r.text)
+                if not rows:
+                    # no listings -> likely end of pages
+                    break
+                for r_ in rows:
+                    r_["category"] = "deep"
+                all_rows.extend(rows)
+                pages_scraped += 1
+                time.sleep(min(rate, 2.5) + random.uniform(0, .6))
             except Exception:
-                # ne pas stopper l'exécution sur une annonce foireuse
-                pass
-    return pd.DataFrame(df_all)
+                # don't stop on occasional errors
+                continue
+
+    df = pd.DataFrame(all_rows)
+    return df, pages_scraped, len(all_rows)
 
 # ---------------------------------------------------
-# 5. Nettoyage automatique (remplacement None -> Unknown, numériques par défaut)
+# Advanced cleaning (normalization + dedupe strategy)
 # ---------------------------------------------------
-def clean_df(df):
+def advanced_clean(df):
+    if df is None or df.empty:
+        return df
     df = df.copy()
-    # Colonnes texte
+
+    # Standardize string columns and replace missing with "Unknown"
     str_cols = ["brand","model","fuel","gearbox","owner","adress","ref","category"]
-    for col in str_cols:
-        if col in df.columns:
-            # remplacer None/NaN et nettoyer espaces
-            df[col] = df[col].fillna("").astype(str).str.strip()
-            df[col] = df[col].replace({"": "Unknown", "None": "Unknown", "nan": "Unknown"})
-    # Colonnes numériques
+    for c in str_cols:
+        if c in df.columns:
+            df[c] = df[c].fillna("").astype(str).str.strip()
+            df[c] = df[c].replace({"": "Unknown", "None": "Unknown", "nan": "Unknown"})
+
+    # Normalize brand casing (capitalize)
+    if "brand" in df.columns:
+        df["brand"] = df["brand"].apply(lambda x: x.title() if isinstance(x, str) else x)
+
+    # Clean numeric columns
     if "year" in df.columns:
-        df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(-1).astype(int)
+        df["year"] = pd.to_numeric(df["year"].astype(str).str.replace(r"[^0-9\-]", "", regex=True), errors="coerce").fillna(-1).astype(int)
     if "km" in df.columns:
-        # retirer tout sauf chiffres puis numeric
-        df["km"] = df["km"].astype(str).str.replace(r"[^0-9]", "", regex=True)
-        df["km"] = pd.to_numeric(df["km"], errors="coerce").fillna(0).astype(int)
+        df["km"] = pd.to_numeric(df["km"].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce").fillna(0).astype(int)
     if "price" in df.columns:
-        df["price"] = df["price"].astype(str).str.replace(r"[^0-9]", "", regex=True)
-        df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0).astype(int)
-    # Supprimer doublons
+        df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce").fillna(0).astype(int)
+
+    # Remove exact duplicates
     df = df.drop_duplicates().reset_index(drop=True)
+
+    # Smart dedupe: prefer rows with price>0 and km>0; group by (brand, model, ref) or (brand,model,year)
+    key_cols = []
+    if all(c in df.columns for c in ["brand","model","ref"]):
+        key_cols = ["brand","model","ref"]
+    elif all(c in df.columns for c in ["brand","model","year"]):
+        key_cols = ["brand","model","year"]
+
+    if key_cols:
+        def choose_best(group):
+            # prefer larger non-zero price and non-zero km
+            group = group.copy()
+            group["score"] = ((group.get("price", 0) > 0).astype(int) * 3) + ((group.get("km", 0) > 0).astype(int) * 1)
+            best = group.sort_values(["score", "price", "km"], ascending=[False, False, False]).iloc[0]
+            return best.drop(labels=["score"], errors="ignore")
+        df = df.groupby(key_cols, dropna=False).apply(choose_best).reset_index(drop=True)
+
     return df
 
 # ---------------------------------------------------
-# 6. Page Scraping
+# When launch clicked: run scraping (cached)
 # ---------------------------------------------------
-if page == "Scraping":
-    st.header("Scraping Dakar Auto")
-    # on garde l'input dans la sidebar comme avant pour garder la mise en page GW-like
-    num_pages = st.sidebar.number_input("Nombre de pages à scraper par catégorie", min_value=1, max_value=50, value=1, step=1)
+if launch:
+    with st.spinner("Lancement du scraping PRO..."):
+        df_raw, pages_done, rows_count = do_scrape(mode, num_pages, max_pages_deep, deep_start_url, user_agent, rate_seconds)
+    st.success(f"Scraping terminé — pages scrappées: {pages_done}, annonces trouvées: {rows_count}")
 
-    URLS = {
-        "voitures": "https://dakar-auto.com/senegal/voitures-4?&page=",
-        "location": "https://dakar-auto.com/senegal/location-de-voitures-19?&page=",
-        "motos": "https://dakar-auto.com/senegal/motos-and-scooters-3?&page="
-    }
-
-    if st.button("Lancer le Scraping"):
-        with st.spinner("Scraping en cours..."):
-            for cat, base_url in URLS.items():
-                df_tmp = scrape_dakar_auto(base_url, num_pages)
-                df_tmp["category"] = cat
-                df_tmp = clean_df(df_tmp)  # <-- Nettoyage automatique
-                st.session_state[f"df_{cat}"] = df_tmp
-        st.success("Scraping terminé !")
-
-    # Affichage et téléchargement
-    for cat in URLS.keys():
-        st.subheader(f"Données {cat.capitalize()}")
-        # Utiliser columns pour afficher boutons côte à côte
-        c1, c2 = st.columns([1, 3])
-        with c1:
-            if st.button(f"Afficher {cat}"):
-                if f"df_{cat}" in st.session_state:
-                    st.dataframe(st.session_state[f"df_{cat}"], use_container_width=True)
-                else:
-                    st.warning(f"Aucune donnée disponible pour {cat}. Lancez le scraping d'abord.")
-        with c2:
-            if f"df_{cat}" in st.session_state:
-                csv_bytes = st.session_state[f"df_{cat}"].to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label=f"Télécharger {cat}",
-                    data=csv_bytes,
-                    file_name=f"{cat}_scraped.csv",
-                    mime="text/csv"
-                )
-
-    # Sauvegarde SQLite
-    conn = sqlite3.connect("dakar_auto_data.db")
-    for cat in URLS.keys():
-        if f"df_{cat}" in st.session_state:
-            st.session_state[f"df_{cat}"].to_sql(cat, conn, if_exists="replace", index=False)
-    conn.close()
-    st.info("Les données ont été sauvegardées dans la base SQLite 'dakar_auto_data.db'.")
-
-# ---------------------------------------------------
-# 7. Dashboard
-# ---------------------------------------------------
-if page == "Dashboard":
-    st.header("Dashboard complet")
-    conn = sqlite3.connect("dakar_auto_data.db")
-    dfs = {}
-    for cat in ["voitures","location","motos"]:
-        try:
-            dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
-            if not dfs[cat].empty:
-                dfs[cat] = clean_df(dfs[cat])  # nettoyage au chargement
-        except Exception:
-            dfs[cat] = pd.DataFrame()
-    conn.close()
-
-    if all(df.empty for df in dfs.values()):
-        st.info("Aucune donnée disponible. Lancez d'abord le scraping.")
+    if df_raw is None or df_raw.empty:
+        st.warning("Aucune annonce récupérée — vérifier l'URL, user-agent ou paramètres.")
     else:
-        df_total = pd.concat(dfs.values(), ignore_index=True)
-
-        st.subheader("Informations sur le dataset")
-        st.markdown(f"- Dimensions : {df_total.shape[0]} lignes, {df_total.shape[1]} colonnes")
-        st.markdown("**Valeurs manquantes par colonne :**")
-        st.dataframe(df_total.isnull().sum())
-        st.markdown("**Statistiques descriptives :**")
-        st.dataframe(df_total.describe(include='all').T)
-        st.subheader("Données brutes")
-        st.dataframe(df_total)
-
-        # Visualisations interactives
-        if "price" in df_total.columns and df_total["price"].notnull().any():
-            st.plotly_chart(px.histogram(df_total, x="price", nbins=30, title="Distribution des prix"), use_container_width=True)
-
-        if "category" in df_total.columns:
-            df_cat_count = df_total["category"].value_counts().reset_index()
-            df_cat_count.columns = ["category","category_count"]
-            st.plotly_chart(px.bar(df_cat_count, x="category", y="category_count", title="Nombre de listings par catégorie"), use_container_width=True)
-            st.plotly_chart(px.pie(df_cat_count, names="category", values="category_count", title="Proportion par catégorie"), use_container_width=True)
-
-        if "brand" in df_total.columns:
-            df_brand_count = df_total["brand"].value_counts().reset_index()
-            df_brand_count.columns = ["brand","count"]
-            st.plotly_chart(px.bar(df_brand_count, x="brand", y="count", title="Nombre de véhicules par marque"), use_container_width=True)
-
-            df_top10_brand = df_brand_count.head(10)
-            st.plotly_chart(px.pie(df_top10_brand, names="brand", values="count", title="Top 10 marques"), use_container_width=True)
-
-            if "price" in df_total.columns:
-                df_brand_price = df_total.groupby("brand")["price"].mean().reset_index().sort_values("price", ascending=False)
-                st.plotly_chart(px.bar(df_brand_price, x="brand", y="price", title="Prix moyen par marque"), use_container_width=True)
-
-                st.plotly_chart(px.box(df_total, x="category", y="price", title="Boxplot : Prix par catégorie"), use_container_width=True)
-                top10_brands = df_total["brand"].value_counts().head(10).index
-                st.plotly_chart(px.box(df_total[df_total["brand"].isin(top10_brands)], x="brand", y="price", title="Boxplot : Prix par marque (Top 10)"), use_container_width=True)
-
-        # Scatter price vs km
-        if "price" in df_total.columns and "km" in df_total.columns:
-            df_scatter = df_total[(df_total["price"].notnull()) & (df_total["km"].notnull())]
-            if not df_scatter.empty:
-                df_scatter["km"] = pd.to_numeric(df_scatter["km"], errors='coerce')
-                df_scatter = df_scatter.dropna(subset=["km"])
-                st.plotly_chart(px.scatter(df_scatter, x="km", y="price", color="category",
-                                           hover_data=["brand","model","year"], title="Prix vs kilométrage"), use_container_width=True)
-
-        if "year" in df_total.columns:
-            df_year = df_total[df_total["year"].notnull()]
-            st.plotly_chart(px.histogram(df_year, x="year", nbins=20, title="Répartition des années des véhicules"), use_container_width=True)
-
-        csv = df_total.to_csv(index=False).encode("utf-8")
-        st.download_button(label="Télécharger toutes les données du scraping", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
-
-# ---------------------------------------------------
-# 8. Page anciens CSV
-# ---------------------------------------------------
-if page == "Ancien CSV":
-    st.header("Fichiers CSV existants")
-    data_folder = "data"
-    if os.path.exists(data_folder):
-        csv_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
-        if csv_files:
-            for file in csv_files:
-                if st.button(f"Afficher {file}"):
-                    df_file = pd.read_csv(os.path.join(data_folder, file))
-                    st.dataframe(df_file)
-                csv_bytes = pd.read_csv(os.path.join(data_folder, file)).to_csv(index=False).encode("utf-8")
-                st.download_button(label=f"Télécharger {file}", data=csv_bytes, file_name=file, mime="text/csv")
+        # advanced cleaning optional
+        if do_clean:
+            df_clean = advanced_clean(df_raw)
         else:
-            st.warning("Aucun fichier CSV trouvé dans data.")
+            df_clean = df_raw.copy()
+
+        # save to session and optionally sqlite
+        st.session_state["df_all"] = df_clean
+        if save_sql:
+            conn = sqlite3.connect("dakar_auto_data.db")
+            # store in a single table with category preserved
+            df_clean.to_sql("dakar_auto_all", conn, if_exists="replace", index=False)
+            conn.close()
+            st.info("Données sauvegardées dans dakar_auto_data.db (table: dakar_auto_all)")
+
+        # show a few KPIs
+        total = len(df_clean)
+        avg_price = int(df_clean["price"].mean()) if "price" in df_clean.columns and not df_clean["price"].isnull().all() else 0
+        median_price = int(df_clean["price"].median()) if "price" in df_clean.columns and not df_clean["price"].isnull().all() else 0
+        unique_brands = df_clean["brand"].nunique() if "brand" in df_clean.columns else 0
+
+        k1, k2, k3, k4 = st.columns([1,1,1,1])
+        k1.metric("Total annonces", f"{total:,}")
+        k2.metric("Prix moyen (FCFA)", f"{avg_price:,}")
+        k3.metric("Prix médian (FCFA)", f"{median_price:,}")
+        k4.metric("Marques uniques", f"{unique_brands}")
+
+        # quick preview
+        st.subheader("Aperçu des données (nettoyées)")
+        st.dataframe(df_clean.head(200), use_container_width=True)
+
+        # Allow user to download full cleaned CSV
+        csv_bytes = df_clean.to_csv(index=False).encode("utf-8")
+        st.download_button("Télécharger dataset complet (cleaned).csv", csv_bytes, "dakar_auto_cleaned.csv", "text/csv")
+
+# ---------------------------------------------------
+# Dashboard: advanced filters & interactive exploration
+# ---------------------------------------------------
+st.markdown("---")
+st.header("Dashboard interactif")
+
+df_all = st.session_state.get("df_all", None)
+# If not in session, try to load from sqlite (if exists)
+if df_all is None:
+    if os.path.exists("dakar_auto_data.db"):
+        try:
+            conn = sqlite3.connect("dakar_auto_data.db")
+            df_tmp = pd.read_sql("SELECT * FROM dakar_auto_all", conn)
+            conn.close()
+            df_all = advanced_clean(df_tmp)
+            st.session_state["df_all"] = df_all
+            st.success("Chargé les données depuis la base SQLite.")
+        except Exception:
+            df_all = None
+
+if df_all is None or df_all.empty:
+    st.info("Aucune donnée disponible pour le Dashboard — lancez d'abord le scraping PRO.")
+else:
+    # Filters
+    st.sidebar.markdown("### 🔎 Filtres Dashboard")
+    brands = sorted(df_all["brand"].unique()) if "brand" in df_all.columns else []
+    cats = sorted(df_all["category"].unique()) if "category" in df_all.columns else []
+    min_price = int(df_all["price"].min()) if "price" in df_all.columns else 0
+    max_price = int(df_all["price"].max()) if "price" in df_all.columns else 10000000
+    min_year = int(df_all["year"].replace(-1, pd.NA).dropna().min()) if "year" in df_all.columns else 1900
+    max_year = int(df_all["year"].max()) if "year" in df_all.columns else 2050
+
+    sel_brand = st.sidebar.multiselect("Marques", options=brands, default=brands[:6])
+    sel_cat = st.sidebar.multiselect("Catégories", options=cats, default=cats if cats else [])
+    sel_price = st.sidebar.slider("Prix (FCFA)", min_price, max_price, (min_price, max_price))
+    sel_year = st.sidebar.slider("Année", min_year if min_year>1900 else 1900, max_year, (min_year if min_year>1900 else 1900, max_year))
+    text_search = st.sidebar.text_input("Recherche texte (brand/model/address/ref)")
+
+    # apply filters
+    df_view = df_all.copy()
+    if sel_brand:
+        df_view = df_view[df_view["brand"].isin(sel_brand)]
+    if sel_cat:
+        df_view = df_view[df_view["category"].isin(sel_cat)]
+    if "price" in df_view.columns:
+        df_view = df_view[(df_view["price"] >= sel_price[0]) & (df_view["price"] <= sel_price[1])]
+    if "year" in df_view.columns:
+        # treat -1 as unknown -> include if range includes -1? we'll exclude unknown by default
+        df_view = df_view[(df_view["year"] >= sel_year[0]) & (df_view["year"] <= sel_year[1])]
+
+    if text_search:
+        s = text_search.strip().lower()
+        mask = pd.Series(False, index=df_view.index)
+        for c in ["brand","model","adress","ref"]:
+            if c in df_view.columns:
+                mask = mask | df_view[c].astype(str).str.lower().str.contains(s)
+        df_view = df_view[mask]
+
+    st.subheader(f"Résultats filtrés ({len(df_view):,} annonces)")
+
+    # show small KPIs for filtered view
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Annonces filtrées", f"{len(df_view):,}")
+    if "price" in df_view.columns and not df_view["price"].empty:
+        c2.metric("Prix moyen (filtré)", f"{int(df_view['price'].mean()):,}")
+        c3.metric("Prix médian (filtré)", f"{int(df_view['price'].median()):,}")
     else:
-        st.info("Le dossier data n'existe pas.")
+        c2.metric("Prix moyen (filtré)", "0")
+        c3.metric("Prix médian (filtré)", "0")
+
+    # Main visualizations
+    col1, col2 = st.columns(2)
+    with col1:
+        if "price" in df_view.columns and not df_view["price"].empty:
+            fig = px.histogram(df_view, x="price", nbins=40, title="Distribution des prix")
+            st.plotly_chart(fig, use_container_width=True)
+    with col2:
+        if "brand" in df_view.columns:
+            vc = df_view["brand"].value_counts().reset_index().rename(columns={"index":"brand","brand":"count"})
+            fig2 = px.bar(vc.head(15), x="brand", y="count", title="Top marques (filtré)")
+            st.plotly_chart(fig2, use_container_width=True)
+
+    # Scatter price vs km
+    if all(c in df_view.columns for c in ["price","km"]):
+        df_sc = df_view[(df_view["price"]>0)]
+        if not df_sc.empty:
+            fig3 = px.scatter(df_sc, x="km", y="price", color="brand", hover_data=["model","year","adress"], title="Prix vs Kilométrage")
+            st.plotly_chart(fig3, use_container_width=True)
+
+    # Data table and export filtered
+    st.subheader("Table des annonces (filtrées)")
+    st.dataframe(df_view.reset_index(drop=True), use_container_width=True)
+    csv_f = df_view.to_csv(index=False).encode("utf-8")
+    st.download_button("Télécharger (filtré).csv", csv_f, "dakar_auto_filtered.csv", "text/csv")
 
 # ---------------------------------------------------
-# 9. Page À propos
+# End: footer
 # ---------------------------------------------------
-if page == "À propos":
-    st.header("À propos de l'application")
-    st.markdown("""
-    Cette application est inspirée de **MyBestApp-2025**.
-    Elle permet de scraper les annonces de Dakar Auto, visualiser les données,
-    télécharger les CSV, et explorer les anciens fichiers existants.
-    """)
-    st.markdown("Créée par : *OGOUNCHI Géraud*")
-
-# ---------------------------------------------------
-# 10. Page Évaluer l'application
-# ---------------------------------------------------
-if page == "Évaluer l'application":
-    st.header("Évaluez mon application")
-    st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant le formulaire ci-dessous :")
-    st.markdown(
-        """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="800" frameborder="0"></iframe>""",
-        unsafe_allow_html=True
-    )
-
-# ---------------------------------------------------
-# 11. Footer premium
-# ---------------------------------------------------
-st.markdown("""
-<hr>
-<p style='text-align:center; color:#C8D6E5; margin-top:20px;'>
-Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
-</p>
-""", unsafe_allow_html=True)
+st.markdown("---")
+st.markdown("<p style='text-align:center; color:#C8D6E5;'>Développé avec ❤️ — Deep Search & Dashboard PRO · Streamlit & BeautifulSoup</p>", unsafe_allow_html=True)
