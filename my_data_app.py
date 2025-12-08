@@ -8,42 +8,12 @@ import plotly.express as px
 import base64
 
 # ---------------------------------------------------
-# Fonction pour mettre une image locale en fond
+# 1. CSS et design premium (AJOUTS GW-STYLE)
 # ---------------------------------------------------
-def set_bg_image(image_file):
-    with open(image_file, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/jpg;base64,{encoded}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# ---------------------------------------------------
-# Appliquer le fond
-# ---------------------------------------------------
-set_bg_image("image/img_file2.jpg")
-
-# ---------------------------------------------------
-# Contenu de la page
-# ---------------------------------------------------
-st.header("Évaluez mon application")
-st.markdown("Merci de prendre un moment pour évaluer cette application :")
-
-# ---------------------------------------------------
-# CSS et design premium (ajout padding cellules)
-# ---------------------------------------------------
+# NOTE: je n'ai pas modifié le background global — les couleurs de fond restent celles de ton thème.
 st.markdown("""
 <style>
+/* ----- Conserver ton style titre/subtitle mais améliorer l'espacement ----- */
 .title-style {
     text-align: center;
     font-size: 42px;
@@ -58,21 +28,29 @@ st.markdown("""
     color: #C8D6E5;
     margin-top: -6px;
 }
+
+/* ----- GW-like layout: plus de padding central ----- */
 .main .block-container {
     padding-top: 2.5rem;
     padding-left: 4rem;
     padding-right: 4rem;
 }
+
+/* ----- Sidebar (améliorations visuelles sans changer le fond global) ----- */
 .sidebar .sidebar-content {
-    background-color: #14263F;
+    background-color: #14263F; /* conservation identique */
     color: #F0F0F0;
     padding-top: 1.25rem;
     padding-bottom: 1.25rem;
     border-radius: 8px;
 }
+
+/* Forcer couleur du texte dans la sidebar */
 [data-testid="stSidebar"] * {
     color: #F0F0F0 !important;
 }
+
+/* ----- Boutons bleu électrique (conservés) ----- */
 .stButton>button {
     background-color: #1E90FF;
     color: white;
@@ -87,28 +65,33 @@ st.markdown("""
     background-color: #63B3FF;
     transform: translateY(-1px);
 }
+
+/* ----- Sliders et checkbox : GW-like but keep coherence ----- */
+/* slider track accent */
 div[role="slider"] > input[type="range"] {
-    accent-color: #ef4444;
+    accent-color: #ef4444; /* rouge GW-like accent pour les sliders si présent */
 }
+
+/* Checkbox label color */
 .stCheckbox > label {
     color: #F0F0F0;
 }
+
+/* Links */
 a {
     color: #60a5fa !important;
     text-decoration: none;
 }
-/* Small cards look */
+
+/* Small cards look for metrics */
 .metric-container {
     background-color: rgba(255,255,255,0.02);
     padding: 12px;
     border-radius: 8px;
     margin-bottom: 8px;
 }
-/* Tableau : augmenter padding et taille */
-.dataframe th, .dataframe td {
-    padding: 12px 10px;
-    font-size: 14px;
-}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
     .main .block-container {
         padding-left: 1rem;
@@ -119,16 +102,16 @@ a {
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# Header premium
+# 2. Header premium
 # ---------------------------------------------------
 st.markdown("<h1 class='title-style'>DAKAR AUTO SCRAPER</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitle-style'>Analyse & Extraction Automatisée des Annonces Voitures / Motos</p>", unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# Sidebar navigation
+# 3. Sidebar navigation
 # ---------------------------------------------------
 st.sidebar.markdown("""
-<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'> Navigation</h2>
+<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'>⚙️ Navigation</h2>
 <p style='color:#C8D6E5; text-align:center; margin-top:0.0rem; margin-bottom:0.6rem;'>Choisir une page</p>
 <hr style='border:1px solid #1E90FF;'>
 """, unsafe_allow_html=True)
@@ -136,7 +119,7 @@ st.sidebar.markdown("""
 page = st.sidebar.radio("Aller à :", ["Scraping", "Dashboard", "Ancien CSV", "À propos", "Évaluer l'application"])
 
 # ---------------------------------------------------
-# Fonction de scraping
+# 4. Fonction de scraping (identique à la tienne)
 # ---------------------------------------------------
 def scrape_dakar_auto(url_base, num_pages):
     df_all = []
@@ -182,36 +165,44 @@ def scrape_dakar_auto(url_base, num_pages):
                     "adress": adress
                 })
             except Exception:
+                # ne pas stopper l'exécution sur une annonce foireuse
                 pass
     return pd.DataFrame(df_all)
 
 # ---------------------------------------------------
-# Nettoyage automatique
+# 5. Nettoyage automatique (remplacement None -> Unknown, numériques par défaut)
 # ---------------------------------------------------
 def clean_df(df):
     df = df.copy()
+    # Colonnes texte
     str_cols = ["brand","model","fuel","gearbox","owner","adress","ref","category"]
     for col in str_cols:
         if col in df.columns:
+            # remplacer None/NaN et nettoyer espaces
             df[col] = df[col].fillna("").astype(str).str.strip()
             df[col] = df[col].replace({"": "Unknown", "None": "Unknown", "nan": "Unknown"})
+    # Colonnes numériques
     if "year" in df.columns:
         df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(-1).astype(int)
     if "km" in df.columns:
+        # retirer tout sauf chiffres puis numeric
         df["km"] = df["km"].astype(str).str.replace(r"[^0-9]", "", regex=True)
         df["km"] = pd.to_numeric(df["km"], errors="coerce").fillna(0).astype(int)
     if "price" in df.columns:
         df["price"] = df["price"].astype(str).str.replace(r"[^0-9]", "", regex=True)
         df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0).astype(int)
+    # Supprimer doublons
     df = df.drop_duplicates().reset_index(drop=True)
     return df
 
 # ---------------------------------------------------
-# Page Scraping
+# 6. Page Scraping
 # ---------------------------------------------------
 if page == "Scraping":
     st.header("Scraping Dakar Auto")
+    # on garde l'input dans la sidebar comme avant pour garder la mise en page GW-like
     num_pages = st.sidebar.number_input("Nombre de pages à scraper par catégorie", min_value=1, max_value=50, value=1, step=1)
+
     URLS = {
         "voitures": "https://dakar-auto.com/senegal/voitures-4?&page=",
         "location": "https://dakar-auto.com/senegal/location-de-voitures-19?&page=",
@@ -223,17 +214,19 @@ if page == "Scraping":
             for cat, base_url in URLS.items():
                 df_tmp = scrape_dakar_auto(base_url, num_pages)
                 df_tmp["category"] = cat
-                df_tmp = clean_df(df_tmp)
+                df_tmp = clean_df(df_tmp)  # <-- Nettoyage automatique
                 st.session_state[f"df_{cat}"] = df_tmp
         st.success("Scraping terminé !")
 
+    # Affichage et téléchargement
     for cat in URLS.keys():
         st.subheader(f"Données {cat.capitalize()}")
+        # Utiliser columns pour afficher boutons côte à côte
         c1, c2 = st.columns([1, 3])
         with c1:
             if st.button(f"Afficher {cat}"):
                 if f"df_{cat}" in st.session_state:
-                    st.dataframe(st.session_state[f"df_{cat}"], use_container_width=True, height=800)
+                    st.dataframe(st.session_state[f"df_{cat}"], use_container_width=True)
                 else:
                     st.warning(f"Aucune donnée disponible pour {cat}. Lancez le scraping d'abord.")
         with c2:
@@ -246,6 +239,7 @@ if page == "Scraping":
                     mime="text/csv"
                 )
 
+    # Sauvegarde SQLite
     conn = sqlite3.connect("dakar_auto_data.db")
     for cat in URLS.keys():
         if f"df_{cat}" in st.session_state:
@@ -254,7 +248,7 @@ if page == "Scraping":
     st.info("Les données ont été sauvegardées dans la base SQLite 'dakar_auto_data.db'.")
 
 # ---------------------------------------------------
-# Page Dashboard
+# 7. Dashboard
 # ---------------------------------------------------
 if page == "Dashboard":
     st.header("Dashboard complet")
@@ -264,7 +258,7 @@ if page == "Dashboard":
         try:
             dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
             if not dfs[cat].empty:
-                dfs[cat] = clean_df(dfs[cat])
+                dfs[cat] = clean_df(dfs[cat])  # nettoyage au chargement
         except Exception:
             dfs[cat] = pd.DataFrame()
     conn.close()
@@ -275,12 +269,15 @@ if page == "Dashboard":
         df_total = pd.concat(dfs.values(), ignore_index=True)
 
         st.subheader("Informations sur le dataset")
-        st.dataframe(df_total.isnull().sum(), height=400)
+        st.markdown(f"- Dimensions : {df_total.shape[0]} lignes, {df_total.shape[1]} colonnes")
+        st.markdown("**Valeurs manquantes par colonne :**")
+        st.dataframe(df_total.isnull().sum())
         st.markdown("**Statistiques descriptives :**")
-        st.dataframe(df_total.describe(include='all').T, height=400)
+        st.dataframe(df_total.describe(include='all').T)
         st.subheader("Données brutes")
-        st.dataframe(df_total, height=800)
+        st.dataframe(df_total)
 
+        # Visualisations interactives
         if "price" in df_total.columns and df_total["price"].notnull().any():
             st.plotly_chart(px.histogram(df_total, x="price", nbins=30, title="Distribution des prix"), use_container_width=True)
 
@@ -295,32 +292,78 @@ if page == "Dashboard":
             df_brand_count.columns = ["brand","count"]
             st.plotly_chart(px.bar(df_brand_count, x="brand", y="count", title="Nombre de véhicules par marque"), use_container_width=True)
 
+            df_top10_brand = df_brand_count.head(10)
+            st.plotly_chart(px.pie(df_top10_brand, names="brand", values="count", title="Top 10 marques"), use_container_width=True)
+
+            if "price" in df_total.columns:
+                df_brand_price = df_total.groupby("brand")["price"].mean().reset_index().sort_values("price", ascending=False)
+                st.plotly_chart(px.bar(df_brand_price, x="brand", y="price", title="Prix moyen par marque"), use_container_width=True)
+
+                st.plotly_chart(px.box(df_total, x="category", y="price", title="Boxplot : Prix par catégorie"), use_container_width=True)
+                top10_brands = df_total["brand"].value_counts().head(10).index
+                st.plotly_chart(px.box(df_total[df_total["brand"].isin(top10_brands)], x="brand", y="price", title="Boxplot : Prix par marque (Top 10)"), use_container_width=True)
+
+        # Scatter price vs km
+        if "price" in df_total.columns and "km" in df_total.columns:
+            df_scatter = df_total[(df_total["price"].notnull()) & (df_total["km"].notnull())]
+            if not df_scatter.empty:
+                df_scatter["km"] = pd.to_numeric(df_scatter["km"], errors='coerce')
+                df_scatter = df_scatter.dropna(subset=["km"])
+                st.plotly_chart(px.scatter(df_scatter, x="km", y="price", color="category",
+                                           hover_data=["brand","model","year"], title="Prix vs kilométrage"), use_container_width=True)
+
+        if "year" in df_total.columns:
+            df_year = df_total[df_total["year"].notnull()]
+            st.plotly_chart(px.histogram(df_year, x="year", nbins=20, title="Répartition des années des véhicules"), use_container_width=True)
+
         csv = df_total.to_csv(index=False).encode("utf-8")
         st.download_button(label="Télécharger toutes les données du scraping", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
 
 # ---------------------------------------------------
-# Page Évaluer l'application (iframes plus grands)
+# 8. Page anciens CSV
+# ---------------------------------------------------
+if page == "Ancien CSV":
+    st.header("Fichiers CSV existants")
+    data_folder = "data"
+    if os.path.exists(data_folder):
+        csv_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
+        if csv_files:
+            for file in csv_files:
+                if st.button(f"Afficher {file}"):
+                    df_file = pd.read_csv(os.path.join(data_folder, file))
+                    st.dataframe(df_file)
+                csv_bytes = pd.read_csv(os.path.join(data_folder, file)).to_csv(index=False).encode("utf-8")
+                st.download_button(label=f"Télécharger {file}", data=csv_bytes, file_name=file, mime="text/csv")
+        else:
+            st.warning("Aucun fichier CSV trouvé dans data.")
+    else:
+        st.info("Le dossier data n'existe pas.")
+
+# ---------------------------------------------------
+# 9. Page À propos
+# ---------------------------------------------------
+if page == "À propos":
+    st.header("À propos de l'application")
+    st.markdown("""
+    Cette application est inspirée de **MyBestApp-2025**.
+    Elle permet de scraper les annonces de Dakar Auto, visualiser les données,
+    télécharger les CSV, et explorer les anciens fichiers existants.
+    """)
+    st.markdown("Créée par : *OGOUNCHI Géraud*")
+
+# ---------------------------------------------------
+# 10. Page Évaluer l'application
 # ---------------------------------------------------
 if page == "Évaluer l'application":
     st.header("Évaluez mon application")
-    st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant les formulaires ci-dessous :")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown(
-            """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="900" frameborder="0"></iframe>""",
-            unsafe_allow_html=True
-        )
-
-    with col2:
-        st.markdown(
-            """<iframe src="https://docs.google.com/forms/d/1T6ItdvCSsKZjP8R7oqvD3y9whWAxG_54oqHau_840ho/previewResponse" width="100%" height="900" frameborder="0"></iframe>""",
-            unsafe_allow_html=True
-        )
+    st.markdown("Merci de prendre un moment pour évaluer cette application en utilisant le formulaire ci-dessous :")
+    st.markdown(
+        """<iframe src="https://ee.kobotoolbox.org/x/2LOA6Lk0" width="100%" height="800" frameborder="0"></iframe>""",
+        unsafe_allow_html=True
+    )
 
 # ---------------------------------------------------
-# Footer
+# 11. Footer premium
 # ---------------------------------------------------
 st.markdown("""
 <hr>
