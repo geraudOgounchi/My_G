@@ -1,6 +1,15 @@
 [theme]
-backgroundColor="#ECE1A2"
-secondaryBackgroundColor="#ecdcaa"
-textColor="#0e0f10"
-font="serif"
+# Fond bleu nuit moderne
+backgroundColor = "#0A1A2F"
 
+# Fond secondaire gris métal clair
+secondaryBackgroundColor = "#14263F"
+
+# Texte blanc premium
+textColor = "#F0F0F0"
+
+# Accent bleu électrique (style dashboard moderne)
+primaryColor = "#1E90FF"
+
+# Police professionnelle
+font = "sans serif"
