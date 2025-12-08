@@ -113,7 +113,32 @@ def scrape_dakar_auto(url_base, num_pages):
     return pd.DataFrame(df_all)
 
 # ---------------------------------------------------
-# 5. Page Scraping
+# 5. Cleaning automatique
+# ---------------------------------------------------
+def clean_df(df):
+    df = df.copy()
+    
+    # Nettoyer les colonnes string
+    str_cols = ["brand","model","fuel","gearbox","owner","adress","ref","category"]
+    for col in str_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip().replace({"None":"", "nan":""})
+    
+    # Numeric columns
+    if "year" in df.columns:
+        df["year"] = pd.to_numeric(df["year"], errors="coerce")
+    if "km" in df.columns:
+        df["km"] = pd.to_numeric(df["km"].str.replace(r"[^0-9]","", regex=True), errors="coerce")
+    if "price" in df.columns:
+        df["price"] = pd.to_numeric(df["price"], errors="coerce")
+    
+    # Supprimer doublons
+    df = df.drop_duplicates().reset_index(drop=True)
+    
+    return df
+
+# ---------------------------------------------------
+# 6. Page Scraping
 # ---------------------------------------------------
 if page == "Scraping":
     st.header("Scraping Dakar Auto")
@@ -130,6 +155,7 @@ if page == "Scraping":
             for cat, base_url in URLS.items():
                 df_tmp = scrape_dakar_auto(base_url, num_pages)
                 df_tmp["category"] = cat
+                df_tmp = clean_df(df_tmp)  # <-- Nettoyage automatique
                 st.session_state[f"df_{cat}"] = df_tmp
         st.success("Scraping terminé !")
 
@@ -160,7 +186,7 @@ if page == "Scraping":
     st.info("Les données ont été sauvegardées dans la base SQLite 'dakar_auto_data.db'.")
 
 # ---------------------------------------------------
-# 6. Page Dashboard
+# 7. Page Dashboard
 # ---------------------------------------------------
 if page == "Dashboard":
     st.header("Dashboard complet")
@@ -169,6 +195,8 @@ if page == "Dashboard":
     for cat in ["voitures","location","motos"]:
         try:
             dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
+            if not dfs[cat].empty:
+                dfs[cat] = clean_df(dfs[cat])  # <-- Nettoyage automatique
         except:
             dfs[cat] = pd.DataFrame()
     conn.close()
@@ -224,7 +252,7 @@ if page == "Dashboard":
         st.download_button(label="Télécharger toutes les données du scraping", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
 
 # ---------------------------------------------------
-# 7. Page anciens CSV
+# 8. Page anciens CSV
 # ---------------------------------------------------
 if page == "Ancien CSV":
     st.header("Fichiers CSV existants")
@@ -239,12 +267,12 @@ if page == "Ancien CSV":
                 csv_bytes = pd.read_csv(os.path.join(data_folder, file)).to_csv(index=False).encode("utf-8")
                 st.download_button(label=f"Télécharger {file}", data=csv_bytes, file_name=file, mime="text/csv")
         else:
-            st.warning("Aucun fichier CSV trouvé dans data1.")
+            st.warning("Aucun fichier CSV trouvé dans data.")
     else:
-        st.info("Le dossier data1 n'existe pas.")
+        st.info("Le dossier data n'existe pas.")
 
 # ---------------------------------------------------
-# 8. Page À propos
+# 9. Page À propos
 # ---------------------------------------------------
 if page == "À propos":
     st.header("À propos de l'application")
@@ -256,7 +284,7 @@ if page == "À propos":
     st.markdown("Créée par : *OGOUNCHI Géraud*")
 
 # ---------------------------------------------------
-# 9. Page Évaluer l'application
+# 10. Page Évaluer l'application
 # ---------------------------------------------------
 if page == "Évaluer l'application":
     st.header("Évaluez mon application")
@@ -267,7 +295,7 @@ if page == "Évaluer l'application":
     )
 
 # ---------------------------------------------------
-# 10. Footer premium
+# 11. Footer premium
 # ---------------------------------------------------
 st.markdown("""
 <hr>
@@ -275,4 +303,3 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
-
