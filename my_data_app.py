@@ -7,22 +7,34 @@ import os
 import plotly.express as px
 import base64
 
-# ---------------------------------------------------
-# CSS pour le fond
-# ---------------------------------------------------
-page_bg_img = """
-<style>
-.stApp {
-background-image: url("https://images.unsplash.com/photo-1517949908117-3c9d15e0d846?auto=format&fit=crop&w=1470&q=80"); /* Exemple : voiture */
-background-size: cover;
-background-position: center;
-background-repeat: no-repeat;
-background-attachment: fixed;
-}
+import streamlit as st
+import base64
 
-</style>
-"""
-st.markdown(page_bg_img, unsafe_allow_html=True)
+# ---------------------------------------------------
+# Fonction pour mettre une image locale en fond
+# ---------------------------------------------------
+def set_bg_image(image_file):
+    with open(image_file, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ---------------------------------------------------
+# Appliquer le fond
+# ---------------------------------------------------
+set_bg_image("images/fond_voiture_moto.jpg")  # Chemin vers ton image
 
 # ---------------------------------------------------
 # Contenu de la page
@@ -407,4 +419,5 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
