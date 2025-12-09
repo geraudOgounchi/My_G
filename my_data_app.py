@@ -114,8 +114,7 @@ st.markdown("<p class='subtitle-style'>Automated Analysis & Extraction of Car / 
 # SIDEBAR — NAVIGATION
 
 st.sidebar.markdown("""
-<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'>⚙️ Navigation</h2>
-<p style='color:#C8D6E5; text-align:center; margin-top:0.0rem; margin-bottom:0.6rem;'>Select a page</p>
+<h2 style='color:#1E90FF; text-align:center; margin-bottom:0.2rem;'> Navigation</h2>
 <hr style='border:1px solid #1E90FF;'>
 """, unsafe_allow_html=True)
 
@@ -384,3 +383,4 @@ st.markdown("""
 Developed for the Dakar Auto community · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
