@@ -37,13 +37,6 @@ def set_bg_image(image_file):
 set_bg_image("image/img_file2.jpg")  # Chemin vers ton image
 
 # ---------------------------------------------------
-# Contenu de la page
-# ---------------------------------------------------
-st.header("Évaluez mon application")
-st.markdown("Merci de prendre un moment pour évaluer cette application :")
-
-
-# ---------------------------------------------------
 # 1. CSS et design premium (AJOUTS GW-STYLE)
 # ---------------------------------------------------
 # NOTE: je n'ai pas modifié le background global — les couleurs de fond restent celles de ton thème.
@@ -416,6 +409,7 @@ st.markdown("""
 Développé avec coeur pour la communauté Dakar Auto · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
 
 
