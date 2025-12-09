@@ -269,49 +269,74 @@ if page == "Scraping":
 
 # PAGE: DASHBOARD
 if page == "Dashboard":
-
-    st.header("Complete Dashboard")
-
+    st.header("Dashboard complet")
     conn = sqlite3.connect("dakar_auto_data.db")
     dfs = {}
-
-    for cat in ["cars", "rental", "motorcycles"]:
+    for cat in ["voitures","location","motos"]:
         try:
             dfs[cat] = pd.read_sql(f"SELECT * FROM {cat}", conn)
             if not dfs[cat].empty:
-                dfs[cat] = clean_df(dfs[cat])
-        except:
+                dfs[cat] = clean_df(dfs[cat])  # nettoyage au chargement
+        except Exception:
             dfs[cat] = pd.DataFrame()
-
     conn.close()
 
     if all(df.empty for df in dfs.values()):
-        st.info("No data available.")
+        st.info("Aucune donnée disponible. Lancez d'abord le scraping.")
     else:
         df_total = pd.concat(dfs.values(), ignore_index=True)
 
-        st.subheader("Dataset Info")
-        st.dataframe(df_total.describe(include="all").T)
+        st.subheader("Informations sur le dataset")
+        st.markdown(f"- Dimensions : {df_total.shape[0]} lignes, {df_total.shape[1]} colonnes")
+        st.markdown("**Valeurs manquantes par colonne :**")
+        st.dataframe(df_total.isnull().sum())
+        st.markdown("**Statistiques descriptives :**")
+        st.dataframe(df_total.describe(include='all').T)
+        st.subheader("Données brutes")
         st.dataframe(df_total)
 
-        if "price" in df_total.columns:
-            st.plotly_chart(px.histogram(df_total, x="price"), use_container_width=True)
+        # Visualisations interactives
+        if "price" in df_total.columns and df_total["price"].notnull().any():
+            st.plotly_chart(px.histogram(df_total, x="price", nbins=30, title="Distribution des prix"), use_container_width=True)
 
         if "category" in df_total.columns:
             df_cat_count = df_total["category"].value_counts().reset_index()
-            df_cat_count.columns = ["category","count"]
-
-            st.plotly_chart(px.bar(df_cat_count, x="category", y="count"), use_container_width=True)
-            st.plotly_chart(px.pie(df_cat_count, names="category", values="count"), use_container_width=True)
+            df_cat_count.columns = ["category","category_count"]
+            st.plotly_chart(px.bar(df_cat_count, x="category", y="category_count", title="Nombre de listings par catégorie"), use_container_width=True)
+            st.plotly_chart(px.pie(df_cat_count, names="category", values="category_count", title="Proportion par catégorie"), use_container_width=True)
 
         if "brand" in df_total.columns:
             df_brand_count = df_total["brand"].value_counts().reset_index()
             df_brand_count.columns = ["brand","count"]
+            st.plotly_chart(px.bar(df_brand_count, x="brand", y="count", title="Nombre de véhicules par marque"), use_container_width=True)
 
-            st.plotly_chart(px.bar(df_brand_count, x="brand", y="count"), use_container_width=True)
+            df_top10_brand = df_brand_count.head(10)
+            st.plotly_chart(px.pie(df_top10_brand, names="brand", values="count", title="Top 10 marques"), use_container_width=True)
+
+            if "price" in df_total.columns:
+                df_brand_price = df_total.groupby("brand")["price"].mean().reset_index().sort_values("price", ascending=False)
+                st.plotly_chart(px.bar(df_brand_price, x="brand", y="price", title="Prix moyen par marque"), use_container_width=True)
+
+                st.plotly_chart(px.box(df_total, x="category", y="price", title="Boxplot : Prix par catégorie"), use_container_width=True)
+                top10_brands = df_total["brand"].value_counts().head(10).index
+                st.plotly_chart(px.box(df_total[df_total["brand"].isin(top10_brands)], x="brand", y="price", title="Boxplot : Prix par marque (Top 10)"), use_container_width=True)
+
+        # Scatter price vs km
+        if "price" in df_total.columns and "km" in df_total.columns:
+            df_scatter = df_total[(df_total["price"].notnull()) & (df_total["km"].notnull())]
+            if not df_scatter.empty:
+                df_scatter["km"] = pd.to_numeric(df_scatter["km"], errors='coerce')
+                df_scatter = df_scatter.dropna(subset=["km"])
+                st.plotly_chart(px.scatter(df_scatter, x="km", y="price", color="category",
+                                           hover_data=["brand","model","year"], title="Prix vs kilométrage"), use_container_width=True)
+
+        if "year" in df_total.columns:
+            df_year = df_total[df_total["year"].notnull()]
+            st.plotly_chart(px.histogram(df_year, x="year", nbins=20, title="Répartition des années des véhicules"), use_container_width=True)
 
         csv = df_total.to_csv(index=False).encode("utf-8")
-        st.download_button("Download all data", csv, "dakar_auto.csv")
+        st.download_button(label="Download all data", data=csv, file_name="dakar_auto_scraped_all.csv", mime="text/csv")
+
 
 
 # PAGE: OLD CSV
@@ -383,4 +408,5 @@ st.markdown("""
 Developed for the Dakar Auto community · Powered by Streamlit & BeautifulSoup
 </p>
 """, unsafe_allow_html=True)
+
 
